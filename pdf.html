@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Converter & Merger Studio</title>
+    <!-- Tailwind CSS for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- pdf-lib for merging PDFs -->
+    <script src="https://unpkg.com/pdf-lib@1.4.0/dist/pdf-lib.min.js"></script>
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-50 text-slate-800 min-p-0 flex flex-col min-h-screen">
+
+    <!-- Header -->
+    <header class="bg-indigo-600 text-white shadow-md">
+        <div class="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+            <h1 class="text-xl font-bold flex items-center gap-2">
+                <i class="fa-solid fa-file-pdf text-2xl"></i> PDF Toolbox
+            </h1>
+            <span class="text-xs bg-indigo-500 px-3 py-1 rounded-full uppercase tracking-wider font-semibold">Client-Side Secure</span>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-5xl mx-auto px-6 py-8 flex-grow w-full grid gap-8 md:grid-cols-2">
+
+        <!-- SECTION 1: File to PDF Converter -->
+        <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between">
+            <div>
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="bg-indigo-50 text-indigo-600 p-3 rounded-xl">
+                        <i class="fa-solid fa-file-arrow-up text-xl"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-bold">Convert to PDF</h2>
+                        <p class="text-sm text-slate-500">Images (JPG, PNG) or Text files to PDF</p>
+                    </div>
+                </div>
+
+                <!-- Dropzone -->
+                <label for="convertFile" class="border-2 border-dashed border-slate-200 hover:border-indigo-500 rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer bg-slate-50 transition-all group mb-4">
+                    <i class="fa-solid fa-cloud-arrow-up text-3xl text-slate-400 group-hover:text-indigo-500 mb-2 transition-colors"></i>
+                    <span class="text-sm font-medium text-slate-600 group-hover:text-indigo-600" id="convertFileName">Choose a file or drag it here</span>
+                    <span class="text-xs text-slate-400 mt-1">Supports PNG, JPG, JPEG, TXT</span>
+                    <input type="file" id="convertFile" class="hidden" accept=".png, .jpg, .jpeg, .txt">
+                </label>
+            </div>
+
+            <button onclick="handleConvert()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-4 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2">
+                <i class="fa-solid fa-gear"></i> Convert & Download
+            </button>
+        </section>
+
+        <!-- SECTION 2: PDF Merger -->
+        <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between">
+            <div>
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="bg-emerald-50 text-emerald-600 p-3 rounded-xl">
+                        <i class="fa-solid fa-object-ungroup text-xl"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-bold">Merge PDFs</h2>
+                        <p class="text-sm text-slate-500">Combine multiple PDF files into one</p>
+                    </div>
+                </div>
+
+                <!-- Dropzone -->
+                <label for="mergeFiles" class="border-2 border-dashed border-slate-200 hover:border-emerald-500 rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer bg-slate-50 transition-all group mb-4">
+                    <i class="fa-solid fa-files text-3xl text-slate-400 group-hover:text-emerald-500 mb-2 transition-colors"></i>
+                    <span class="text-sm font-medium text-slate-600 group-hover:text-emerald-600" id="mergeFilesCount">Select multiple PDF files</span>
+                    <span class="text-xs text-slate-400 mt-1">Only .pdf files allowed</span>
+                    <input type="file" id="mergeFiles" class="hidden" accept=".pdf" multiple>
+                </label>
+
+                <!-- File List Preview -->
+                <div id="fileList" class="max-h-28 overflow-y-auto text-xs space-y-1 mb-4 text-slate-500"></div>
+            </div>
+
+            <button onclick="handleMerge()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2.5 px-4 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2">
+                <i class="fa-solid fa-compress"></i> Merge & Download
+            </button>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="text-center py-6 text-xs text-slate-400">
+        <p>All file processing happens locally in your browser. Your files never leave your device.</p>
+    </footer>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // --- CONVERTER LOGIC ---
+        const convertFileInput = document.getElementById('convertFile');
+        const convertFileName = document.getElementById('convertFileName');
+
+        convertFileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                convertFileName.textContent = e.target.files[0].name;
+            }
+        });
+
+        async function handleConvert() {
+            const file = convertFileInput.files[0];
+            if (!file) {
+                alert('Please select a file to convert first.');
+                return;
+            }
+
+            const fileExtension = file.name.split('.').pop().toLowerCase();
+
+            if (['jpg', 'jpeg', 'png'].includes(fileExtension)) {
+                const reader = new FileReader();
+                reader.readAsArrayBuffer(file);
+                reader.onload = async () => {
+                    try {
+                        const pdfDoc = await PDFLib.PDFDocument.create();
+                        const page = pdfDoc.addPage();
+                        
+                        let embeddedImage;
+                        if (fileExtension === 'png') {
+                            embeddedImage = await pdfDoc.embedPng(reader.result);
+                        } else {
+                            embeddedImage = await pdfDoc.embedJpg(reader.result);
+                        }
+
+                        // Manual aspect ratio calculation replacing scaleToFit
+                        const pageWidth = page.getWidth();
+                        const pageHeight = page.getHeight();
+                        const maxW = pageWidth - 80;
+                        const maxH = pageHeight - 80;
+
+                        const imgDims = embeddedImage.scale(1);
+                        const scaleFactor = Math.min(maxW / imgDims.width, maxH / imgDims.height);
+                        const width = imgDims.width * scaleFactor;
+                        const height = imgDims.height * scaleFactor;
+
+                        page.drawImage(embeddedImage, {
+                            x: (pageWidth - width) / 2,
+                            y: (pageHeight - height) / 2,
+                            width,
+                            height,
+                        });
+
+                        const pdfBytes = await pdfDoc.save();
+                        downloadBlob(pdfBytes, `${file.name.substring(0, file.name.lastIndexOf('.'))}.pdf`, 'application/pdf');
+                    } catch (err) {
+                        alert('Error converting image: ' + err.message);
+                    }
+                };
+            } else if (fileExtension === 'txt') {
+                const reader = new FileReader();
+                reader.readAsText(file);
+                reader.onload = async () => {
+                    try {
+                        const pdfDoc = await PDFLib.PDFDocument.create();
+                        const page = pdfDoc.addPage();
+                        const { height } = page.getSize();
+                        
+                        // Sanitize special characters to prevent WinAnsi encoding errors
+                        const sanitizedText = reader.result.replace(/[^\x00-\xFF]/g, '?');
+
+                        page.drawText(sanitizedText, {
+                            x: 50,
+                            y: height - 50,
+                            size: 12,
+                            maxWidth: page.getWidth() - 100,
+                        });
+
+                        const pdfBytes = await pdfDoc.save();
+                        downloadBlob(pdfBytes, `${file.name.substring(0, file.name.lastIndexOf('.'))}.pdf`, 'application/pdf');
+                    } catch (err) {
+                        alert('Error converting text: ' + err.message);
+                    }
+                };
+            } else {
+                alert('Unsupported file type for direct conversion. Please use PNG, JPG, or TXT.');
+            }
+        }
+
+        // --- MERGER LOGIC ---
+        const mergeFilesInput = document.getElementById('mergeFiles');
+        const mergeFilesCount = document.getElementById('mergeFilesCount');
+        const fileListContainer = document.getElementById('fileList');
+
+        mergeFilesInput.addEventListener('change', (e) => {
+            const files = e.target.files;
+            fileListContainer.innerHTML = '';
+            if (files.length > 0) {
+                mergeFilesCount.textContent = `${files.length} file(s) selected`;
+                Array.from(files).forEach((f, idx) => {
+                    const div = document.createElement('div');
+                    div.className = 'truncate bg-slate-100 px-2 py-1 rounded';
+                    div.textContent = `${idx + 1}. ${f.name}`;
+                    fileListContainer.appendChild(div);
+                });
+            } else {
+                mergeFilesCount.textContent = 'Select multiple PDF files';
+            }
+        });
+
+        async function handleMerge() {
+            const files = mergeFilesInput.files;
+            if (files.length < 2) {
+                alert('Please select at least 2 PDF files to merge.');
+                return;
+            }
+
+            try {
+                const mergedPdf = await PDFLib.PDFDocument.create();
+
+                for (let file of files) {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const pdf = await PDFLib.PDFDocument.load(arrayBuffer);
+                    const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+                    copiedPages.forEach((page) => mergedPdf.addPage(page));
+                }
+
+                const mergedPdfBytes = await mergedPdf.save();
+                downloadBlob(mergedPdfBytes, 'merged_document.pdf', 'application/pdf');
+            } catch (err) {
+                alert('Error merging PDFs: ' + err.message);
+            }
+        }
+
+        // --- HELPER FUNCTION FOR DOWNLOADING ---
+        function downloadBlob(data, filename, mimeType) {
+            const blob = new Blob([data], { type: mimeType });
+            const url = window.URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = filename;
+            anchor.click();
+            window.URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
